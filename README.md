@@ -1,2 +1,2 @@
-# Sisteme-de-baze-de-date---Gestionarea-rezultatelor-sportivilor-dintr-un-club-la-competi-ii-
+# Gestionarea rezultatelor sportivilor dintr-un club la competii
 Proiect Master an 1
