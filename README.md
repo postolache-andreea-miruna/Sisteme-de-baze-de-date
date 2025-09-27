@@ -1,4 +1,4 @@
-# Gestionarea rezultatelor sportivilor dintr-un club la competii
+# Gestionarea rezultatelor sportivilor dintr-un club la competitii
 Proiect Master an 1
 
  Cerinţe proiect:
