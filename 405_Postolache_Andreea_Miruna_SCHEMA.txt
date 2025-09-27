@@ -1,0 +1,653 @@
+CREATE TABLE CLUB
+(cod_club NUMBER(5),
+nume_club VARCHAR2(50) CONSTRAINT nume_club_nn NOT NULL,
+UNIQUE (nume_club)
+);
+ALTER TABLE CLUB 
+ADD CONSTRAINT cod_club_pk PRIMARY KEY (cod_club);
+
+
+CREATE TABLE ANTRENOR
+(
+cod_antrenor NUMBER(5),
+nume VARCHAR2(25) CONSTRAINT nume_antrenor_nn NOT NULL,
+prenume VARCHAR2(25) CONSTRAINT prenume_antrenor_nn NOT NULL,
+anul_nasterii DATE CONSTRAINT nastere_nn NOT NULL,
+gen CHAR(1) CONSTRAINT gen_nn NOT NULL, 
+ani_experienta NUMBER(3),--poate fi null
+salariu NUMBER(8,2) CONSTRAINT salariu_min CHECK (salariu>300.00),
+cod_club NUMBER(5),
+CONSTRAINT genul CHECK (gen='M' OR gen='F')
+);
+ALTER TABLE ANTRENOR 
+ADD CONSTRAINT cod_antrenor_pk PRIMARY KEY(cod_antrenor);
+ALTER TABLE ANTRENOR 
+ADD CONSTRAINT cod_club_fk FOREIGN KEY(cod_club) REFERENCES CLUB (cod_club);
+ALTER TABLE ANTRENOR
+MODIFY cod_club number(5) NOT NULL;
+
+
+CREATE TABLE NATIONALITATE
+(
+cod_nationalitate NUMBER(5),
+nume_nationalitate VARCHAR2(15) CONSTRAINT nationalitate_sportiv_nn NOT NULL,
+UNIQUE (nume_nationalitate),
+CONSTRAINT cod_nationalitate_pk PRIMARY KEY (cod_nationalitate)
+);
+
+
+CREATE TABLE SPORTIV
+(
+cod_sportiv NUMBER(5),
+gen CHAR(1) CONSTRAINT genul_sp_nn NOT NULL,
+nume VARCHAR2(25) CONSTRAINT nume_sportiv_nn NOT NULL,
+prenume VARCHAR2(25) CONSTRAINT prenume_sportiv_nn NOT NULL,
+anul_nasterii DATE CONSTRAINT nastere_sp_nn NOT NULL,
+cod_nationalitate NUMBER(5)CONSTRAINT nationalitate_sp_nn NOT NULL,
+CONSTRAINT genul_sp CHECK (gen='M' OR gen='F'),
+tip_sportiv VARCHAR2(25) CONSTRAINT tip_sportiv_nn NOT NULL,
+indemnizatie NUMBER(5,1),
+cod_antrenor NUMBER(5),
+CONSTRAINT cod_sportiv_pk PRIMARY KEY (cod_sportiv),
+CONSTRAINT cod_antrenor_fk FOREIGN KEY(cod_antrenor) REFERENCES ANTRENOR (cod_antrenor),
+CONSTRAINT cod_nationalitate_fk FOREIGN KEY(cod_nationalitate) REFERENCES NATIONALITATE (cod_nationalitate)
+);
+ALTER TABLE SPORTIV
+MODIFY cod_antrenor number(5) NOT NULL;
+
+
+CREATE TABLE SPONSOR
+(cod_sponsor NUMBER(5),
+nume VARCHAR2(50) CONSTRAINT nume_sponsor_nn NOT NULL,
+suma_contributie NUMBER(5,1)  CONSTRAINT suma_sponsor_nn NOT NULL,
+UNIQUE (nume),
+CONSTRAINT cod_sponsor_pk PRIMARY KEY (cod_sponsor)
+);
+
+CREATE TABLE SPONSORIZEAZA
+(cod_sponsor NUMBER(5),
+cod_sportiv NUMBER(5),
+inceput_colaborare DATE CONSTRAINT inc_colab_nn NOT NULL,
+sfarsit_colaborare DATE CONSTRAINT sf_colab_nn NOT NULL,
+CONSTRAINT datele CHECK (inceput_colaborare<sfarsit_colaborare),
+CONSTRAINT pk_cod_sponsor_cod_sportiv_colab PRIMARY KEY (cod_sponsor,cod_sportiv,inceput_colaborare),
+CONSTRAINT cod_sponsor_fk FOREIGN KEY (cod_sponsor) REFERENCES SPONSOR (cod_sponsor),
+CONSTRAINT cod_sportiv_fk FOREIGN KEY (cod_sportiv) REFERENCES SPORTIV (cod_sportiv)
+);
+
+CREATE TABLE TIP
+(cod_tip NUMBER(5),
+tip_competitie VARCHAR2(20) CONSTRAINT comp_tip_nn NOT NULL,
+UNIQUE(tip_competitie)
+);
+ALTER TABLE TIP
+ADD CONSTRAINT cod_tip_pk PRIMARY KEY (cod_tip);
+
+
+CREATE TABLE TARA
+(cod_tara CHAR(2),
+nume_tara VARCHAR2(25) CONSTRAINT nume_tara_nn NOT NULL,
+UNIQUE(nume_tara)
+);
+ALTER TABLE TARA
+ADD CONSTRAINT cod_tara_pk PRIMARY KEY (cod_tara);
+
+
+CREATE TABLE ORAS
+(cod_oras NUMBER(5),
+nume_oras VARCHAR2(25) CONSTRAINT nume_oras_nn NOT NULL,
+cod_tara CHAR(2),
+CONSTRAINT cod_oras_pk PRIMARY KEY (cod_oras),
+CONSTRAINT cod_tara_fk FOREIGN KEY (cod_tara) REFERENCES TARA (cod_tara),
+UNIQUE (nume_oras)
+);
+ALTER TABLE ORAS
+MODIFY cod_tara char(2) NOT NULL;
+
+
+CREATE TABLE COMPETITIE
+(cod_competitie NUMBER(5),
+nume  VARCHAR2(30) CONSTRAINT nume_comp_nn NOT NULL,
+data_start DATE CONSTRAINT data_start_nn NOT NULL,
+data_final DATE CONSTRAINT data_final_nn NOT NULL, 
+taxa_participare NUMBER(4,1) CONSTRAINT taxa_nn NOT NULL,
+cod_oras NUMBER(5),
+cod_tip NUMBER(5),
+CONSTRAINT cod_competitie_pk PRIMARY KEY (cod_competitie),
+CONSTRAINT cod_tip_fk FOREIGN KEY (cod_tip) REFERENCES TIP (cod_tip),
+CONSTRAINT cod_oras_fk FOREIGN KEY (cod_oras) REFERENCES ORAS (cod_oras),
+CONSTRAINT date_concurs CHECK (data_start<data_final),
+UNIQUE (nume)
+);
+ALTER TABLE COMPETITIE
+MODIFY cod_oras number(5) NOT NULL;
+ALTER TABLE COMPETITIE
+MODIFY cod_tip number(5) NOT NULL;
+
+
+CREATE TABLE PROBA
+(
+cod_proba NUMBER(5),
+nume VARCHAR2(30) CONSTRAINT nume_proba_nn NOT NULL,
+CONSTRAINT cod_proba_pk PRIMARY KEY (cod_proba),
+UNIQUE (nume)
+);
+
+
+CREATE TABLE ISTORIC_SPORTIV
+(
+data_rezultate_sportiv DATE CONSTRAINT data_sportiv_rez NOT NULL,
+cod_istoric  NUMBER(5),
+cod_rezultat  NUMBER(5),
+cod_sportiv  NUMBER(5),
+CONSTRAINT pk_istoric_rezultat_sportiv primary key(cod_istoric, cod_rezultat,cod_sportiv),
+CONSTRAINT cod_sportivul_fk FOREIGN KEY (cod_sportiv) REFERENCES SPORTIV (cod_sportiv)
+);
+
+
+CREATE TABLE REZULTAT
+(
+cod_rezultat NUMBER(5),
+cod_proba NUMBER(5),
+loc_clasament NUMBER(4) CONSTRAINT loc_cls_nn NOT NULL,
+timp_obtinut NUMBER(5) CONSTRAINT timp_nn NOT NULL,--IN SECUNDE
+cod_sportiv NUMBER(5),
+cod_istoric NUMBER(5),
+CONSTRAINT pk_rezultat PRIMARY KEY(cod_rezultat),
+CONSTRAINT fk_istoric_rezultat_sportiv FOREIGN KEY(cod_istoric, cod_rezultat,cod_sportiv) REFERENCES ISTORIC_SPORTIV (cod_istoric,cod_rezultat,cod_sportiv),
+CONSTRAINT fk_proba FOREIGN KEY(cod_proba) REFERENCES PROBA (cod_proba)
+);
+
+
+CREATE TABLE PARTICIPA
+(
+cod_sportiv NUMBER(5),
+cod_competitie NUMBER(5),
+cod_proba NUMBER(5),
+medaliat NUMBER(1) CONSTRAINT medalie_nn NOT NULL,
+CONSTRAINT medaliat_da_sau_nu CHECK (medaliat IN (1,0)),
+CONSTRAINT pk_sportiv_rezultat_sportiv PRIMARY KEY (cod_sportiv,cod_competitie,cod_proba),
+CONSTRAINT cod_sportivi_fk FOREIGN KEY (cod_sportiv) REFERENCES SPORTIV (cod_sportiv),
+CONSTRAINT cod_compet_fk FOREIGN KEY (cod_competitie) REFERENCES COMPETITIE (cod_competitie),
+CONSTRAINT cod_probele_fk FOREIGN KEY (cod_proba) REFERENCES PROBA (cod_proba)
+);
+
+
+
+--inserari
+SELECT * FROM CLUB;
+CREATE SEQUENCE SEQ_CLUB
+INCREMENT BY 10
+START WITH 10
+MAXVALUE 10000
+NOCYCLE;
+
+INSERT INTO CLUB
+VALUES(SEQ_CLUB.NEXTVAL, 'AQUA TEAM');
+
+INSERT INTO CLUB
+VALUES(SEQ_CLUB.NEXTVAL, 'DELFINUL BUCURESTI');
+
+INSERT INTO CLUB
+VALUES(SEQ_CLUB.NEXTVAL, 'BUCHAREST SPORT CLUB ELITE');
+
+INSERT INTO CLUB
+VALUES(SEQ_CLUB.NEXTVAL, 'STEAUA CSA');
+
+INSERT INTO CLUB
+VALUES(SEQ_CLUB.NEXTVAL, 'ATACK TEAM');
+
+COMMIT;
+
+CREATE SEQUENCE SEQ_ANTRENOR
+INCREMENT BY 10
+START WITH 20
+MAXVALUE 10000
+NOCYCLE;
+
+SELECT * FROM ANTRENOR;
+--Aqua Team
+INSERT INTO ANTRENOR(cod_antrenor,nume,prenume,anul_nasterii,gen,ani_experienta,salariu,cod_club)
+VALUES (SEQ_ANTRENOR.nextval,'BECHERU','CATALIN',TO_DATE('10-09-1981','DD-MM-YYYY'),'M',10,500,10);
+
+INSERT INTO ANTRENOR(cod_antrenor,nume,prenume,anul_nasterii,gen,ani_experienta,salariu,cod_club)
+VALUES (SEQ_ANTRENOR.nextval,'BECHERU','IULIA',TO_DATE('20-12-1984','DD-MM-YYYY'),'F',8,400.54,10);
+
+INSERT INTO ANTRENOR(cod_antrenor,nume,prenume,anul_nasterii,gen,ani_experienta,salariu,cod_club)
+VALUES (SEQ_ANTRENOR.nextval,'ORMENISAN','DANIEL',TO_DATE('09-06-1988','DD-MM-YYYY'),'M',7,300.3,10);
+
+--Delfinul Bucuresti
+INSERT INTO ANTRENOR(cod_antrenor,nume,prenume,anul_nasterii,gen,ani_experienta,salariu,cod_club)
+VALUES (SEQ_ANTRENOR.nextval,'DRAGULET','DAN',TO_DATE('20-09-1966','DD-MM-YYYY'),'M',20,600.45,20);
+
+INSERT INTO ANTRENOR(cod_antrenor,nume,prenume,anul_nasterii,gen,ani_experienta,salariu,cod_club)
+VALUES (SEQ_ANTRENOR.nextval,'GIURCANEANU','MATEI',TO_DATE('10-09-1963','DD-MM-YYYY'),'M',23,800.5,20);
+
+-- BSC Elite
+INSERT INTO ANTRENOR(cod_antrenor,nume,prenume,anul_nasterii,gen,ani_experienta,salariu,cod_club)
+VALUES (SEQ_ANTRENOR.nextval,'GRIGORE','MARIUS',TO_DATE('25-01-1981','DD-MM-YYYY'),'M',20,700.2,30);
+
+INSERT INTO ANTRENOR(cod_antrenor,nume,prenume,anul_nasterii,gen,ani_experienta,salariu,cod_club)
+VALUES (SEQ_ANTRENOR.nextval,'TOMA','ALEXANDRU',TO_DATE('10-11-1991','DD-MM-YYYY'),'M',10,350,30);
+
+-- Steaua CSA
+INSERT INTO ANTRENOR(cod_antrenor,nume,prenume,anul_nasterii,gen,ani_experienta,salariu,cod_club)
+VALUES (SEQ_ANTRENOR.nextval,'BORDEI','DARIA',TO_DATE('03-09-1976','DD-MM-YYYY'),'F',25,800,40);
+
+INSERT INTO ANTRENOR(cod_antrenor,nume,prenume,anul_nasterii,gen,ani_experienta,salariu,cod_club)
+VALUES (SEQ_ANTRENOR.nextval,'BRAN','IONEL',TO_DATE('10-08-1977','DD-MM-YYYY'),'M',21,650,40);
+
+--Atack Team
+INSERT INTO ANTRENOR(cod_antrenor,nume,prenume,anul_nasterii,gen,ani_experienta,salariu,cod_club)
+VALUES (SEQ_ANTRENOR.nextval,'FIRANESCU','SANDRA',TO_DATE('24-03-1997','DD-MM-YYYY'),'F',4,300.1,50);
+
+INSERT INTO ANTRENOR(cod_antrenor,nume,prenume,anul_nasterii,gen,ani_experienta,salariu,cod_club)
+VALUES (SEQ_ANTRENOR.nextval,'STAN','DENISA',TO_DATE('11-07-1980','DD-MM-YYYY'),'F',6,310,50);
+
+COMMIT;
+
+SELECT * FROM NATIONALITATE;
+
+INSERT INTO NATIONALITATE(cod_nationalitate,nume_nationalitate)
+VALUES (1,'ROMAN');
+INSERT INTO NATIONALITATE(cod_nationalitate,nume_nationalitate)
+VALUES (2,'SPANIOL');
+INSERT INTO NATIONALITATE(cod_nationalitate,nume_nationalitate)
+VALUES (3,'FRANCEZ');
+INSERT INTO NATIONALITATE(cod_nationalitate,nume_nationalitate)
+VALUES (4,'SUEDEZ');
+INSERT INTO NATIONALITATE(cod_nationalitate,nume_nationalitate)
+VALUES (5,'ARAB');
+INSERT INTO NATIONALITATE(cod_nationalitate,nume_nationalitate)
+VALUES (6,'UNGUR');
+INSERT INTO NATIONALITATE(cod_nationalitate,nume_nationalitate)
+VALUES (7,'ENGLEZ');
+
+COMMIT;
+
+
+SELECT * FROM SPORTIV;
+
+INSERT INTO SPORTIV(cod_sportiv,gen,nume,prenume,anul_nasterii,cod_nationalitate,tip_sportiv,indemnizatie,cod_antrenor)
+VALUES (1,'M','MARINCA','RARES',TO_DATE('26-03-2001','DD-MM-YYYY'),1,'SPORTIV',NULL,20);
+
+INSERT INTO SPORTIV(cod_sportiv,gen,nume,prenume,anul_nasterii,cod_nationalitate,tip_sportiv,indemnizatie,cod_antrenor)
+VALUES (2,'M','POPESCU','ROBERT',TO_DATE('21-11-2002','DD-MM-YYYY'),1,'SPORTIV LOT',200,30);
+
+INSERT INTO SPORTIV(cod_sportiv,gen,nume,prenume,anul_nasterii,cod_nationalitate,tip_sportiv,indemnizatie,cod_antrenor)
+VALUES (3,'F','STANCA','IULIA',TO_DATE('28-03-2001','DD-MM-YYYY'),2,'SPORTIV',NULL,40);
+
+INSERT INTO SPORTIV(cod_sportiv,gen,nume,prenume,anul_nasterii,cod_nationalitate,tip_sportiv,indemnizatie,cod_antrenor)
+VALUES (4,'F','BELLU','SARA',TO_DATE('16-08-2000','DD-MM-YYYY'),3,'SPORTIV LOT',300,50);
+
+INSERT INTO SPORTIV(cod_sportiv,gen,nume,prenume,anul_nasterii,cod_nationalitate,tip_sportiv,indemnizatie,cod_antrenor)
+VALUES (5,'M','GROFF','PHILIPPE',TO_DATE('10-03-1999','DD-MM-YYYY'),4,'SPORTIV LOT',500,60);
+
+INSERT INTO SPORTIV(cod_sportiv,gen,nume,prenume,anul_nasterii,cod_nationalitate,tip_sportiv,indemnizatie,cod_antrenor)
+VALUES (6,'M','AHMAD','ZAHED',TO_DATE('22-09-2007','DD-MM-YYYY'),5,'SPORTIV',NULL,70);
+
+INSERT INTO SPORTIV(cod_sportiv,gen,nume,prenume,anul_nasterii,cod_nationalitate,tip_sportiv,indemnizatie,cod_antrenor)
+VALUES (7,'F','BLEJAN','ALEXANDRA',TO_DATE('12-05-2006','DD-MM-YYYY'),1,'SPORTIV',NULL,80);
+
+INSERT INTO SPORTIV(cod_sportiv,gen,nume,prenume,anul_nasterii,cod_nationalitate,tip_sportiv,indemnizatie,cod_antrenor)
+VALUES (8,'F','BUZEA','ANA',TO_DATE('21-07-2001','DD-MM-YYYY'),1,'SPORTIV LOT',600.5,90);
+
+INSERT INTO SPORTIV(cod_sportiv,gen,nume,prenume,anul_nasterii,cod_nationalitate,tip_sportiv,indemnizatie,cod_antrenor)
+VALUES (9,'M','COSTROJ','ANTONIO',TO_DATE('19-07-2002','DD-MM-YYYY'),1,'SPORTIV',NULL,100);
+
+INSERT INTO SPORTIV(cod_sportiv,gen,nume,prenume,anul_nasterii,cod_nationalitate,tip_sportiv,indemnizatie,cod_antrenor)
+VALUES (10,'M','MANAFI','ZOLDA',TO_DATE('20-02-1998','DD-MM-YYYY'),6,'SPORTIV',NULL,110);
+
+INSERT INTO SPORTIV(cod_sportiv,gen,nume,prenume,anul_nasterii,cod_nationalitate,tip_sportiv,indemnizatie,cod_antrenor)
+VALUES (11,'F','PANA','BIANCA',TO_DATE('21-02-1990','DD-MM-YYYY'),1,'SPORTIV LOT',600.5,120);
+
+INSERT INTO SPORTIV(cod_sportiv,gen,nume,prenume,anul_nasterii,cod_nationalitate,tip_sportiv,indemnizatie,cod_antrenor)
+VALUES (12,'M','SIMION','ANDREI',TO_DATE('20-10-1998','DD-MM-YYYY'),1,'SPORTIV LOT',800,30);
+
+COMMIT;
+
+
+
+SELECT * FROM SPONSOR;
+
+INSERT INTO SPONSOR(cod_sponsor,nume,suma_contributie)
+VALUES (1,'RED BULL',500.5);
+
+INSERT INTO SPONSOR(cod_sponsor,nume,suma_contributie)
+VALUES (2,'ISOSTAR',600.4);
+
+INSERT INTO SPONSOR(cod_sponsor,nume,suma_contributie)
+VALUES (3,'INFINITY TROPHY',550.1);
+
+INSERT INTO SPONSOR(cod_sponsor,nume,suma_contributie)
+VALUES (4,'CARREFOUR',800.7);
+
+INSERT INTO SPONSOR(cod_sponsor,nume,suma_contributie)
+VALUES (5,'ENEL',1000.9);
+
+COMMIT;
+
+
+SELECT * FROM SPONSORIZEAZA;
+
+INSERT INTO SPONSORIZEAZA(cod_sponsor,cod_sportiv,inceput_colaborare,sfarsit_colaborare)
+VALUES(1,1,TO_DATE('13-05-2019','DD-MM-YYYY'),TO_DATE('13-06-2023','DD-MM-YYYY'));
+
+INSERT INTO SPONSORIZEAZA(cod_sponsor,cod_sportiv,inceput_colaborare,sfarsit_colaborare)
+VALUES(1,2,TO_DATE('25-09-2020','DD-MM-YYYY'),TO_DATE('25-10-2024','DD-MM-YYYY'));
+
+INSERT INTO SPONSORIZEAZA(cod_sponsor,cod_sportiv,inceput_colaborare,sfarsit_colaborare)
+VALUES(2,1,TO_DATE('12-05-2018','DD-MM-YYYY'),TO_DATE('16-06-2021','DD-MM-YYYY'));
+
+INSERT INTO SPONSORIZEAZA(cod_sponsor,cod_sportiv,inceput_colaborare,sfarsit_colaborare)
+VALUES(2,11,TO_DATE('30-04-2010','DD-MM-YYYY'),TO_DATE('31-05-2020','DD-MM-YYYY'));
+
+INSERT INTO SPONSORIZEAZA(cod_sponsor,cod_sportiv,inceput_colaborare,sfarsit_colaborare)
+VALUES(3,4,TO_DATE('29-03-2019','DD-MM-YYYY'),TO_DATE('30-03-2024','DD-MM-YYYY'));
+
+INSERT INTO SPONSORIZEAZA(cod_sponsor,cod_sportiv,inceput_colaborare,sfarsit_colaborare)
+VALUES(3,5,TO_DATE('26-08-2020','DD-MM-YYYY'),TO_DATE('27-08-2022','DD-MM-YYYY'));
+
+INSERT INTO SPONSORIZEAZA(cod_sponsor,cod_sportiv,inceput_colaborare,sfarsit_colaborare)
+VALUES(4,11,TO_DATE('30-03-2010','DD-MM-YYYY'),TO_DATE('30-04-2021','DD-MM-YYYY'));
+
+INSERT INTO SPONSORIZEAZA(cod_sponsor,cod_sportiv,inceput_colaborare,sfarsit_colaborare)
+VALUES(4,2,TO_DATE('13-05-2021','DD-MM-YYYY'),TO_DATE('13-09-2022','DD-MM-YYYY'));
+
+INSERT INTO SPONSORIZEAZA(cod_sponsor,cod_sportiv,inceput_colaborare,sfarsit_colaborare)
+VALUES(4,6,TO_DATE('21-08-2017','DD-MM-YYYY'),TO_DATE('21-09-2018','DD-MM-YYYY'));
+
+INSERT INTO SPONSORIZEAZA(cod_sponsor,cod_sportiv,inceput_colaborare,sfarsit_colaborare)
+VALUES(5,11,TO_DATE('21-04-2018','DD-MM-YYYY'),TO_DATE('21-05-2022','DD-MM-YYYY'));
+
+INSERT INTO SPONSORIZEAZA(cod_sponsor,cod_sportiv,inceput_colaborare,sfarsit_colaborare)
+VALUES(4,6,TO_DATE('25-09-2018','DD-MM-YYYY'),TO_DATE('27-09-2019','DD-MM-YYYY'));
+
+COMMIT;
+
+
+SELECT * FROM TIP;
+
+INSERT INTO TIP(cod_tip, tip_competitie)
+VALUES(1,'LOCAL');
+
+INSERT INTO TIP(cod_tip, tip_competitie)
+VALUES(2,'MUNICIPAL');
+
+INSERT INTO TIP(cod_tip, tip_competitie)
+VALUES(3,'JUDETEAN');
+
+INSERT INTO TIP(cod_tip, tip_competitie)
+VALUES(4,'EUROPEAN');
+
+INSERT INTO TIP(cod_tip, tip_competitie)
+VALUES(5,'BALCANIC');
+
+INSERT INTO TIP(cod_tip, tip_competitie)
+VALUES(6,'MONDIAL');
+
+COMMIT;
+
+
+
+SELECT* FROM TARA;
+
+INSERT INTO TARA(cod_tara,nume_tara)
+VALUES('RO','ROMANIA');
+
+INSERT INTO TARA(cod_tara,nume_tara)
+VALUES('PO','POLONIA');
+
+INSERT INTO TARA(cod_tara,nume_tara)
+VALUES('FR','FRANTA');
+
+INSERT INTO TARA(cod_tara,nume_tara)
+VALUES('JP','JAPONIA');
+
+INSERT INTO TARA(cod_tara,nume_tara)
+VALUES('IT','ITALIA');
+
+INSERT INTO TARA(cod_tara,nume_tara)
+VALUES('KO','KOREA');
+
+COMMIT;
+
+
+
+SELECT *FROM ORAS;
+
+INSERT INTO ORAS(cod_oras,nume_oras,cod_tara)
+VALUES (1,'BUCURESTI','RO');
+
+INSERT INTO ORAS(cod_oras,nume_oras,cod_tara)
+VALUES (2,'CRAIOVA','RO');
+
+INSERT INTO ORAS(cod_oras,nume_oras,cod_tara)
+VALUES (3,'LUBLIN','PO');
+
+INSERT INTO ORAS(cod_oras,nume_oras,cod_tara)
+VALUES (4,'PARIS','FR');
+
+INSERT INTO ORAS(cod_oras,nume_oras,cod_tara)
+VALUES (5,'KYOTO','JP');
+
+INSERT INTO ORAS(cod_oras,nume_oras,cod_tara)
+VALUES (6,'NAPOLI','IT');
+
+INSERT INTO ORAS(cod_oras,nume_oras,cod_tara)
+VALUES (7,'GWANGJU','KO');
+
+COMMIT;
+
+
+SELECT * FROM COMPETITIE;
+
+INSERT INTO COMPETITIE(cod_competitie,nume,data_start,data_final,taxa_participare,cod_oras,cod_tip)
+VALUES(1,'CUPA DE TOAMNA 2016',TO_DATE('05-11-2016','DD-MM-YYYY'),TO_DATE('06-11-2016','DD-MM-YYYY'),100,1,1);
+
+INSERT INTO COMPETITIE(cod_competitie,nume,data_start,data_final,taxa_participare,cod_oras,cod_tip)
+VALUES(2,'CUPA JAKED 2016',TO_DATE('21-05-2016','DD-MM-YYYY'),TO_DATE('22-05-2016','DD-MM-YYYY'),200,2,2);
+
+INSERT INTO COMPETITIE(cod_competitie,nume,data_start,data_final,taxa_participare,cod_oras,cod_tip)
+VALUES(3,'CUPA ANDREI NICOLESCU EDITIA 1',TO_DATE('15-10-2017','DD-MM-YYYY'),TO_DATE('16-10-2017','DD-MM-YYYY'),400.5,6,4);
+
+INSERT INTO COMPETITIE(cod_competitie,nume,data_start,data_final,taxa_participare,cod_oras,cod_tip)
+VALUES(4,'CUPA DE IARNA 2018',TO_DATE('22-11-2018','DD-MM-YYYY'),TO_DATE('03-12-2018','DD-MM-YYYY'),300,2,3);
+
+INSERT INTO COMPETITIE(cod_competitie,nume,data_start,data_final,taxa_participare,cod_oras,cod_tip)
+VALUES(5,'WORLD AQUATICS CHAMPIONSHIP 1',TO_DATE('12-07-2019','DD-MM-YYYY'),TO_DATE('28-07-2019','DD-MM-YYYY'),900.5,7,6);
+
+INSERT INTO COMPETITIE(cod_competitie,nume,data_start,data_final,taxa_participare,cod_oras,cod_tip)
+VALUES(6,'EUROPEAN GAMES 2021',TO_DATE('23-06-2021','DD-MM-YYYY'),TO_DATE('27-06-2021','DD-MM-YYYY'),700,5,4);
+
+INSERT INTO COMPETITIE(cod_competitie,nume,data_start,data_final,taxa_participare,cod_oras,cod_tip)
+VALUES(7,'JUNIOR CHAMPIONSHIP 2021',TO_DATE('31-07-2021','DD-MM-YYYY'),TO_DATE('10-08-2021','DD-MM-YYYY'),890,3,4);
+
+INSERT INTO COMPETITIE(cod_competitie,nume,data_start,data_final,taxa_participare,cod_oras,cod_tip)
+VALUES(8,'FINA SWIMMING WORLD CUP 2021',TO_DATE('20-08-2021','DD-MM-YYYY'),TO_DATE('24-08-2021','DD-MM-YYYY'),500,4,6);
+
+COMMIT;
+
+
+
+SELECT* FROM PROBA;
+
+INSERT INTO PROBA(cod_proba,nume)
+VALUES(1,'50 LIBER');
+
+INSERT INTO PROBA(cod_proba,nume)
+VALUES(2,'50 SPATE');
+
+INSERT INTO PROBA(cod_proba,nume)
+VALUES(3,'100 LIBER');
+
+INSERT INTO PROBA(cod_proba,nume)
+VALUES(4,'200 BRAS');
+
+INSERT INTO PROBA(cod_proba,nume)
+VALUES(5,'200 FLUTURE');
+
+INSERT INTO PROBA(cod_proba,nume)
+VALUES(6,'400 LIBER');
+
+COMMIT;
+
+
+SELECT * FROM PARTICIPA;
+
+INSERT INTO PARTICIPA(cod_sportiv,cod_competitie,cod_proba,medaliat)
+VALUES(1,1,1,0);
+
+INSERT INTO PARTICIPA(cod_sportiv,cod_competitie,cod_proba,medaliat)
+VALUES(1,4,3,0);
+
+INSERT INTO PARTICIPA(cod_sportiv,cod_competitie,cod_proba,medaliat)
+VALUES(2,4,5,0);
+
+INSERT INTO PARTICIPA(cod_sportiv,cod_competitie,cod_proba,medaliat)
+VALUES(2,1,1,1);
+
+INSERT INTO PARTICIPA(cod_sportiv,cod_competitie,cod_proba,medaliat)
+VALUES(5,5,6,0);
+
+INSERT INTO PARTICIPA(cod_sportiv,cod_competitie,cod_proba,medaliat)
+VALUES(6,1,2,0);
+
+INSERT INTO PARTICIPA(cod_sportiv,cod_competitie,cod_proba,medaliat)
+VALUES(7,1,1,0);
+
+INSERT INTO PARTICIPA(cod_sportiv,cod_competitie,cod_proba,medaliat)
+VALUES(8,5,4,1);
+
+INSERT INTO PARTICIPA(cod_sportiv,cod_competitie,cod_proba,medaliat)
+VALUES(11,2,2,0);
+
+INSERT INTO PARTICIPA(cod_sportiv,cod_competitie,cod_proba,medaliat)
+VALUES(11,3,5,1);
+
+COMMIT;
+
+
+SELECT *FROM ISTORIC_SPORTIV;
+
+INSERT INTO ISTORIC_SPORTIV(data_rezultate_sportiv,cod_istoric,cod_rezultat,cod_sportiv)
+VALUES(TO_DATE('05-11-2016','DD-MM-YYYY'),1,1,1);
+
+INSERT INTO ISTORIC_SPORTIV(data_rezultate_sportiv,cod_istoric,cod_rezultat,cod_sportiv)
+VALUES(TO_DATE('25-11-2018','DD-MM-YYYY'),1,2,1);
+
+INSERT INTO ISTORIC_SPORTIV(data_rezultate_sportiv,cod_istoric,cod_rezultat,cod_sportiv)
+VALUES(TO_DATE('26-11-2018','DD-MM-YYYY'),2,3,2);
+
+INSERT INTO ISTORIC_SPORTIV(data_rezultate_sportiv,cod_istoric,cod_rezultat,cod_sportiv)
+VALUES(TO_DATE('05-11-2016','DD-MM-YYYY'),2,4,2);
+
+INSERT INTO ISTORIC_SPORTIV(data_rezultate_sportiv,cod_istoric,cod_rezultat,cod_sportiv)
+VALUES(TO_DATE('14-07-2019','DD-MM-YYYY'),5,5,5);
+
+INSERT INTO ISTORIC_SPORTIV(data_rezultate_sportiv,cod_istoric,cod_rezultat,cod_sportiv)
+VALUES(TO_DATE('06-11-2016','DD-MM-YYYY'),6,7,6);
+
+INSERT INTO ISTORIC_SPORTIV(data_rezultate_sportiv,cod_istoric,cod_rezultat,cod_sportiv)
+VALUES(TO_DATE('05-11-2016','DD-MM-YYYY'),7,10,7);
+
+INSERT INTO ISTORIC_SPORTIV(data_rezultate_sportiv,cod_istoric,cod_rezultat,cod_sportiv)
+VALUES(TO_DATE('14-07-2019','DD-MM-YYYY'),8,8,8);
+
+INSERT INTO ISTORIC_SPORTIV(data_rezultate_sportiv,cod_istoric,cod_rezultat,cod_sportiv)
+VALUES(TO_DATE('21-05-2016','DD-MM-YYYY'),11,6,11);
+
+INSERT INTO ISTORIC_SPORTIV(data_rezultate_sportiv,cod_istoric,cod_rezultat,cod_sportiv)
+VALUES(TO_DATE('15-10-2017','DD-MM-YYYY'),11,9,11);
+
+COMMIT;
+
+
+SELECT*FROM REZULTAT;
+
+INSERT INTO REZULTAT(cod_rezultat,cod_proba,loc_clasament,timp_obtinut,cod_sportiv,cod_istoric)
+VALUES(1,1,4,30,1,1);
+
+INSERT INTO REZULTAT(cod_rezultat,cod_proba,loc_clasament,timp_obtinut,cod_sportiv,cod_istoric)
+VALUES(2,3,10,70,1,1);
+
+INSERT INTO REZULTAT(cod_rezultat,cod_proba,loc_clasament,timp_obtinut,cod_sportiv,cod_istoric)
+VALUES(3,5,9,180,2,2);
+
+INSERT INTO REZULTAT(cod_rezultat,cod_proba,loc_clasament,timp_obtinut,cod_sportiv,cod_istoric)
+VALUES(4,1,2,26,2,2);
+
+INSERT INTO REZULTAT(cod_rezultat,cod_proba,loc_clasament,timp_obtinut,cod_sportiv,cod_istoric)
+VALUES(5,6,20,420,5,5);
+
+INSERT INTO REZULTAT(cod_rezultat,cod_proba,loc_clasament,timp_obtinut,cod_sportiv,cod_istoric)
+VALUES(6,2,8,43,11,11);
+
+INSERT INTO REZULTAT(cod_rezultat,cod_proba,loc_clasament,timp_obtinut,cod_sportiv,cod_istoric)
+VALUES(7,2,60,70,6,6);
+
+INSERT INTO REZULTAT(cod_rezultat,cod_proba,loc_clasament,timp_obtinut,cod_sportiv,cod_istoric)
+VALUES(8,4,3,170,8,8);
+
+INSERT INTO REZULTAT(cod_rezultat,cod_proba,loc_clasament,timp_obtinut,cod_sportiv,cod_istoric)
+VALUES(9,5,3,175,11,11);
+
+INSERT INTO REZULTAT(cod_rezultat,cod_proba,loc_clasament,timp_obtinut,cod_sportiv,cod_istoric)
+VALUES(10,1,100,62,7,7);
+
+COMMIT;
+
+
+select * from istoric_sportiv;
+
+
+ALTER TABLE ANTRENOR
+ADD cod_sef NUMBER(5);
+
+ALTER TABLE ANTRENOR 
+ADD CONSTRAINT cod_sef_fk FOREIGN KEY(cod_sef) REFERENCES ANTRENOR (cod_antrenor);
+
+UPDATE ANTRENOR
+SET cod_sef = 20
+WHERE cod_antrenor = 30;
+
+UPDATE ANTRENOR
+SET cod_sef = 30
+WHERE cod_antrenor = 40;
+
+
+UPDATE ANTRENOR
+SET cod_sef = 20
+WHERE cod_antrenor = 50;
+
+UPDATE ANTRENOR
+SET cod_sef = 50
+WHERE cod_antrenor = 60;
+
+
+UPDATE ANTRENOR
+SET cod_sef = 20
+WHERE cod_antrenor = 70;
+
+UPDATE ANTRENOR
+SET cod_sef = 70
+WHERE cod_antrenor = 80;
+
+
+UPDATE ANTRENOR
+SET cod_sef = 20
+WHERE cod_antrenor = 90;
+
+UPDATE ANTRENOR
+SET cod_sef = 90
+WHERE cod_antrenor = 100;
+
+
+
+UPDATE ANTRENOR
+SET cod_sef = 20
+WHERE cod_antrenor = 110;
+
+UPDATE ANTRENOR
+SET cod_sef = 110
+WHERE cod_antrenor = 120;

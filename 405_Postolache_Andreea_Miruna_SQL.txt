@@ -1,0 +1,435 @@
+--1.  
+-- Sa se afiseze codul, numele, prenumele, indemnizatia sportivilor, daca sunt medaliati, numele, tipul, data de start si data de final a competitiei la care au participat.
+-- Acestea vor fi afisate pentru sportivii care nu primesc indemnizatie (pentru cei care nu primesc indemnizatie se va trece 0 în coloana indemnizatie)
+-- 				                       sau care participa la competitii care au în componenta primele 4 litere "CUPA"
+-- 				                        si care în ambele cazuri trebuie sa fi participat la competitii care au avut loc cel mult acum 7 ani fata de data curenta.
+-- De asemenea, numele si prenumele vor fi concatenate, iar coloana se va numi corespunzator.
+-- Coloanele cod_sportiv, indemnizatie si numele competitiei se vor numi corespunzator.
+-- Mai mult, aceste date trebuie ordonate dupa numele sportivului.
+
+SELECT sp.cod_sportiv AS "Codul sportivului",CONCAT(sp.nume,'  ')||sp.prenume AS "Nume sportiv",NVL(sp.indemnizatie,0) "Indemnizatie", part.medaliat, comp.nume as "Nume competitie",comp.data_start,comp.data_final, t.tip_competitie
+FROM SPORTIV sp INNER JOIN PARTICIPA part ON(sp.cod_sportiv=part.cod_sportiv)
+                INNER JOIN COMPETITIE comp ON(comp.cod_competitie= part.cod_competitie)
+                INNER JOIN TIP t ON(t.cod_tip=comp.cod_tip)
+WHERE ((sp.indemnizatie = 0 OR INSTR(UPPER(comp.nume), 'CUPA')=1) AND MONTHS_BETWEEN(SYSDATE,comp.data_final)<=84) --7 ani
+ORDER BY "Nume sportiv";
+
+--2.
+-- Pentru cluburile în care indemnizatia maxima este mai mare sau egala cu 500 si indemnizatia minima mai mica sau egala cu 300,
+-- sa se obtina codul, numele acestor cluburi si indemnizatia maxima pe club, indemnizatia minima pe club si media indemnizatiilor pe club.
+-- Nu se tine cont de valorile null de la sportivii care nu au indemnizatie.
+
+SELECT cod_club, nume_club, MAX(indemnizatie)AS "INDEMNIZATIA MAXIMA", MIN(indemnizatie)AS "INDEMNIZATIA MINIMA", AVG(indemnizatie)AS "MEDIE INDEMNIZATII"
+FROM SPORTIV  JOIN ANTRENOR USING(cod_antrenor)
+             JOIN CLUB USING (cod_club)
+GROUP BY cod_club,nume_club
+HAVING MAX(indemnizatie) >= 500 AND MIN(indemnizatie)<=300;
+
+--3.
+-- Sa se afiseze tarile ordonate dupa nume in care a concurat sportivul cu id-ul 11 in anul 2016.
+
+SELECT cod_tara,nume_tara
+FROM TARA
+                WHERE cod_tara IN(SELECT cod_tara
+                                FROM ORAS
+                                WHERE cod_oras IN(SELECT cod_oras
+                                                 FROM COMPETITIE
+                                                WHERE cod_competitie IN (SELECT cod_competitie
+                                                                        FROM PARTICIPA
+                                                                        WHERE cod_sportiv = 11
+                                                                        )
+                                                    )
+                                )
+INTERSECT
+SELECT cod_tara,nume_tara
+FROM TARA
+                WHERE cod_tara IN(SELECT cod_tara
+                                FROM ORAS
+                                WHERE cod_oras IN(SELECT cod_oras
+                                                 FROM COMPETITIE
+                                                 WHERE EXTRACT(YEAR FROM data_start) = 2016
+                                                    )
+                                )
+ORDER BY nume_tara;
+
+
+--4.
+-- Pentru fiecare club care are antrenori (sa se stie ca în aceasta diagrama un club trebuie sa aiba minimum un antrenor)
+-- sa se afiseze codul clubului, suma totala a salariilor primite de antrenorii de la acel club
+-- si într-o coloana cu numele STATUS BUGET SALARII sa se afiseze un mesaj care indica statusul bugetului pentru salarii:
+-- pentru sumele mai mari de 1400 se va afisa mesajul: SUMA ALOCATA DE CLUB PENTRU A PLATI SALARIUL TUTUROR ANTRENORILOR ESTE MARE
+-- pentru sumele între 1200 si 1400 se va afisa mesajul:SUMA ALOCATA DE CLUB PENTRU A PLATI SALARIUL TUTUROR ANTRENORILOR ESTE MEDIE
+-- iar pentru restul se va afisa mesajul: SUMA ALOCATA DE CLUB PENTRU A PLATI SALARIUL TUTUROR ANTRENORILOR ESTE MICA
+
+WITH SALARII AS(SELECT cod_club, SUM(salariu) SUMA
+            FROM  ANTRENOR 
+            GROUP BY cod_club
+            ORDER BY cod_club
+            )
+select cod_club,CONCAT(TO_CHAR(SUMA),'  ')||'LEI' AS "SUMA",
+CASE  WHEN SUMA>1400 THEN 'SUMA ALOCATA DE CLUB PENTRU A PLATI SALARIUL TUTUROR ANTRENORILOR ESTE MARE '
+      WHEN SUMA< 1400 AND SUMA>1200 THEN 'SUMA ALOCATA DE CLUB PENTRU A PLATI SALARIUL TUTUROR ANTRENORILOR ESTE MEDIE'
+      ELSE 'SUMA ALOCATA DE CLUB PENTRU A PLATI SALARIUL TUTUROR ANTRENORILOR ESTE MICA'
+END AS "STATUS BUGET SALARII"
+FROM SALARII;
+
+
+--5.
+-- Sa se insereze în tabelul SPORTIV sportivul cu urmatoarele date: cod= 13, gen=M, nume= MAREL, prenume=RADU,
+-- anul nasterii: 20-09-1966, cu codul nationalitatii 1, tipul : SPORTIV, indemnizatie: null si cu codul antrenorului: 50.
+-- Sa se afiseze numele, prenumele si stadiul sportivului pentru toti sportivii care sunt nascuti în aceeasi data ca antrenorul,
+-- iar antrenorul sa aiba prima litera din nume egala cu prima litera din numele unui club. 
+-- Dupa inserare se construieste cererea, iar dupa rulare se va anula inserarea.
+-- Mai mult, stadiul sportivului va fi o coloana separata cu numele 'Stadiu sportiv' în care se vor afisa în functie 
+-- de indemnizatia primita de sportiv (daca sportivul nu are indemnizatie aceasta va fi inlocuita cu 0) un mesaj:
+-- se va afisa 'Sportivul nu face parte din lot' când indemnizatia este 0, 'sportiv foarte valoros' când indemnizatia este 800,
+-- altfel se va afisa 'sportiv din lot'.
+
+INSERT INTO SPORTIV(cod_sportiv,gen,nume,prenume,anul_nasterii,cod_nationalitate,tip_sportiv,indemnizatie,cod_antrenor)
+VALUES (13,'M','MAREL','RADU',TO_DATE('20-09-1966','DD-MM-YYYY'),1,'SPORTIV',NULL,50);
+
+SELECT nume,prenume,DECODE(NVL(indemnizatie,0),0,'Sportivul nu face parte din lot',800,'Sportiv foarte valoros din lot','Sportiv din lot')AS "Stadiu sportiv"
+FROM SPORTIV sp
+WHERE sp.anul_nasterii  IN(SELECT anul_nasterii
+                        		FROM ANTRENOR antr
+                        		WHERE sp.anul_nasterii=antr.anul_nasterii AND SUBSTR(LOWER(antr.nume),1,1) IN (SELECT SUBSTR(LOWER(cl.nume_club),1,1)
+                                          FROM club cl
+                                         WHERE SUBSTR(LOWER(antr.nume),1,1)=SUBSTR(LOWER(cl.nume_club),1,1)
+                                           )
+                        );
+ROLLBACK;
+
+
+--6.
+-- Sa se afiseze nivelele ierarhice ale tuturor antrenorilor nascuti inainte de 01-01-1991, numele, prenumele si experienta acestora,
+-- dar si numele si prenumele sefului lor ( in cazul in care nu exista un sef, atunci in locul numelui se va trece simbolul "-").
+-- De asemenea, numele si prenumele vor fi concatenate, iar coloana se va numi corespunzator.
+-- Datele vor fi ordonate crescator in functie de nivelul din ierarhie si alfabetic in functie de numele antrenorului
+
+SELECT LEVEL, CONCAT(a.nume,'  ')||a.prenume AS "NUME ANTRENOR",a.ani_experienta, 
+        CASE
+        WHEN NULLIF(sef.nume, '') IS NULL AND NULLIF(sef.prenume, '') IS NULL THEN '-'
+        ELSE CONCAT(sef.nume, ' ')|| sef.prenume
+        END AS "NUME SEF"
+FROM ANTRENOR a
+LEFT JOIN ANTRENOR sef ON a.cod_sef= sef.cod_antrenor
+WHERE a.anul_nasterii < TO_DATE('01-01-1991','DD-MM-YYYY')
+START WITH a.cod_sef IS NULL
+CONNECT BY PRIOR a.cod_antrenor = a.cod_sef
+ORDER BY LEVEL, "NUME ANTRENOR";
+
+--7.
+-- Sa se majoreze cu 10% indemniza?ia pentru sportivii din lot care au obtinut medalie la oricare dintre competitiile desfasurate în ultimii 7 ani.
+-- La final sa se anuleze modificarile.
+--PANA	BIANCA	200 FLUTURE	CUPA ANDREI NICOLESCU EDITIA 1 ANUL 2017     600.5LEI => 660.6 LEI
+--BUZEA	ANA	    200 BRAS	WORLD AQUATICS CHAMPIONSHIP 1      ANUL 2019  600.5LEI => 660.6 LEI
+--SELECT * FROM SPORTIV;
+UPDATE SPORTIV
+SET indemnizatie=indemnizatie*1.1
+WHERE cod_sportiv IN (SELECT UNIQUE cod_sportiv
+                     FROM PARTICIPA
+                     JOIN COMPETITIE ON participa.cod_competitie = competitie.cod_competitie
+                     WHERE medaliat=1 AND competitie.data_start BETWEEN ADD_MONTHS(SYSDATE, -84) AND SYSDATE )
+        AND UPPER(tip_sportiv)=UPPER('SPORTIV LOT');
+        
+ROLLBACK;
+--8.
+-- Sa se afiseze numele si prenumele tuturor sportivilor. 
+-- Pentru fiecare sportiv în parte se vor afisa numele tuturor probelor la care a participat,
+-- iar daca nu au participat la nicio proba câmpul va avea valoarea null
+-- De asemenea, sa se afiseze si toate numele de competitii
+-- Datele sa fie ordonate in functie de data de start a competitiilor.
+
+SELECT s.nume AS "NUME SPORTIV",s.prenume AS "PRENUME SPORTIV",prob.nume AS "PROBA",comp.nume AS "COMPETITITE"
+FROM SPORTIV s 
+                FULL OUTER JOIN PARTICIPA pr ON (s.cod_sportiv= pr.cod_sportiv )
+                FULL OUTER JOIN PROBA prob ON (prob.cod_proba=pr.cod_proba)
+                FULL OUTER JOIN COMPETITIE comp ON (comp.cod_competitie=pr.cod_competitie)
+ORDER BY comp.data_start;
+
+               
+--9.
+/*
+--Sa se afiseze codul sportivilor , numele si prenumele sportivilor care au participat
+--la toate competitiile la care a participat sportivul cu codul 7 si la acelasi numar de probe din cadrul competitiilor.
+--Numele si prenumele trebuie concatenate, iar coloana trebuie numita corespunzator.
+	Pentru a se testa aceast? cerin??, dup? rularea codului ini?ial am f?cut urm?toarele:
+- INSERT INTO PARTICIPA(cod_sportiv,cod_competitie,cod_proba,medaliat)
+  VALUES(1,1,3,0); -- codul sportivului este asociat lui Marinca Rares
+  dac? este rulat? va determina scoaterea sportivului Marinca din afi?are, deoarece el nu va participa la acela?i num?r de probe ca sportivul cu codul 7, Blejan.
+- INSERT INTO PARTICIPA(cod_sportiv,cod_competitie,cod_proba,medaliat)
+  VALUES(7,1,2,0); -- codul sportivului este asociat lui Blejan (cod = 7)
+  dac? este rulat? face ca doar sportivul Marinca s? fie afi?at pentru c? doar el particip? la acelea?i competi?ii cu sportivul cu cod = 7 ?i acela?i num?r de probe.
+  La final a se anula modific?rile.
+*/
+SELECT part.cod_sportiv "COD SPORTIV", nume||' '||prenume "NUME SPORTIV"
+FROM SPORTIV sp 
+RIGHT JOIN PARTICIPA part ON (part.cod_sportiv = sp.cod_sportiv)
+WHERE cod_competitie  IN (SELECT cod_competitie 
+                        FROM participa
+                        WHERE cod_sportiv = 7
+                        )
+AND part.cod_sportiv != 7
+GROUP BY part.cod_sportiv, nume,prenume
+HAVING COUNT(cod_competitie) = (SELECT COUNT(*)
+                    FROM participa
+                    WHERE cod_sportiv = 7
+                    );
+ROLLBACK;
+
+
+--10.
+-- Sa se afiseze in ordine alfabetica numele si prenumele sportivilor care nu au mai participat la niciun concurs incepand cu anul 2017, pana in prezent
+
+
+--se selecteaza numele si prenumele tuturor sportivilor
+SELECT DISTINCT CONCAT(nume,'  ')|| prenume AS "NUME SPORTIV"
+FROM SPORTIV
+
+MINUS --ii scadem pe cei care au mai concurat din 2017 pana in prezent
+--FACEM LEFT JOIN PENTRU A PASTRA DOAR SPORTIVII CARE AU PARTICIPAT LA COMPETITII
+SELECT DISTINCT CONCAT(SPORTIV.nume,'  ')|| SPORTIV.prenume AS "NUME SPORTIV"
+FROM PARTICIPA
+LEFT JOIN COMPETITIE ON PARTICIPA.cod_competitie = COMPETITIE.cod_competitie
+LEFT JOIN SPORTIV ON SPORTIV.cod_sportiv = PARTICIPA.cod_sportiv
+WHERE EXTRACT(YEAR FROM data_start) >= 2017
+ORDER BY "NUME SPORTIV";
+
+
+--11. 
+-- Sa se afiseze numele si prenumele antrenorilor al caror salariu depaseste valoarea medie a
+-- salariilor colegilor sai de club. 
+-- De asemenea sa se afiseze numele cluburilor din care fac parte antrenorii
+-- si numarul de sportivi asociati acestora.
+-- A se ordona alfabetic in functie de numele clubului.
+
+SELECT nume||' '||prenume "NUME ANTRENOR", salariu, nume_club, salariu_mediu,
+(SELECT COUNT(*)
+FROM SPORTIV
+WHERE cod_antrenor = antr.cod_antrenor) "NUMAR SPORTIVI ASOCIATI"
+
+FROM ANTRENOR antr, CLUB cl, 
+(SELECT cod_club, AVG(salariu) salariu_mediu
+ FROM ANTRENOR
+ GROUP BY cod_club) antr_cl
+ 
+WHERE antr.cod_club = cl.cod_club 
+AND cl.cod_club = antr_cl.cod_club 
+AND salariu > (SELECT AVG(salariu)
+                FROM ANTRENOR
+                WHERE cod_club = antr.cod_club)
+
+ORDER BY cl.nume_club;
+ 
+
+
+--12.
+-- Sa se afiseze numele si prenumele antrenorilor ai caror sportivi au urcat pe podium 
+-- la competitiile care au avut loc in Bucuresti sau Napoli
+-- si la acesti antrenori sa se afiseze si cei pentru care salariul se afla in intervalul [300,500]
+
+SELECT DISTINCT antrenor.nume ||' '||antrenor.prenume "NUME ANTRENOR"
+FROM ANTRENOR 
+JOIN SPORTIV ON antrenor.cod_antrenor = sportiv.cod_antrenor
+JOIN PARTICIPA ON sportiv.cod_sportiv = participa.cod_sportiv
+JOIN COMPETITIE ON participa.cod_competitie = competitie.cod_competitie
+JOIN ORAS ON competitie.cod_oras = oras.cod_oras
+WHERE UPPER(nume_oras) IN ('BUCURESTI','NAPOLI')
+AND medaliat = 1
+
+UNION
+
+SELECT antrenor.nume ||' '||antrenor.prenume "NUME ANTRENOR"
+FROM ANTRENOR
+WHERE salariu BETWEEN 300 AND 500;
+
+
+--13.
+-- Sa se afiseze in ordine alfabetica toti sportivii romani (duplicatele sunt permise) care fac parte din lot care au participat
+-- la competitii de tipul LOCAL sau EUROPEAN, sau care au participat la proba de 200 fluture obtinand un timp mai bun de 180s.
+
+SELECT DISTINCT sportiv.nume||' '||sportiv.prenume "NUME SPORTIV"
+FROM SPORTIV
+JOIN NATIONALITATE ON sportiv.cod_nationalitate = nationalitate.cod_nationalitate
+JOIN PARTICIPA ON sportiv.cod_sportiv = participa.cod_sportiv
+JOIN COMPETITIE ON participa.cod_competitie = competitie.cod_competitie
+JOIN TIP ON competitie.cod_tip = tip.cod_tip
+WHERE UPPER(nume_nationalitate) = 'ROMAN' AND UPPER(tip_sportiv)= 'SPORTIV LOT' AND UPPER(tip_competitie) IN ('LOCAL','EUROPEAN')
+
+UNION ALL
+
+SELECT sportiv.nume||' '||sportiv.prenume "NUME SPORTIV"
+FROM ISTORIC_SPORTIV
+JOIN SPORTIV ON istoric_sportiv.cod_sportiv = sportiv.cod_sportiv
+JOIN REZULTAT ON istoric_sportiv.cod_rezultat = rezultat.cod_rezultat
+JOIN PROBA ON rezultat.cod_proba = proba.cod_proba
+WHERE UPPER(proba.nume) = '200 FLUTURE' AND timp_obtinut < 180
+
+ORDER BY "NUME SPORTIV";
+
+--14.
+-- Pentru sportivul care are numele Marinca Rares, cu codul 1 sa se afiseze cei mai buni timpi obtinuti pe timpul sponsorizaii la probele la care a participat
+-- si sa se afiseze numarul sponsorilor pe care i-a avut cand a obtinut rezultatele
+-- dar si codul si numele probei, rezultatul fiind ordonat crescator dupa codul probei.
+
+ROLLBACK;
+-- aceste inserari sunt facute pentru a se vedea mai bine ca se ia cel mai bun timp
+
+-- SE adauga sportivul la competitia cu codul = 4 care are loc in 2018, cand sportivul are 1 sponsor
+-- este adaugat la proba de 50 LIBER, cu timpul de 29
+-- dupa ce se executa cele 3 instructiuni de inserare va aparea proba cu timpul de 29
+INSERT INTO PARTICIPA(cod_sportiv,cod_competitie,cod_proba,medaliat)
+VALUES(1,4,1,0);
+
+INSERT INTO ISTORIC_SPORTIV(data_rezultate_sportiv,cod_istoric,cod_rezultat,cod_sportiv)
+VALUES(TO_DATE('25-11-2018','DD-MM-YYYY'),1,11,1);
+
+INSERT INTO REZULTAT(cod_rezultat,cod_proba,loc_clasament,timp_obtinut,cod_sportiv,cod_istoric)
+VALUES(11,1,5,29,1,1);
+-------
+
+-- COMPETITIA cu cod = 5 are loc in anul 2019 cand sportivul cu codul = 1 are 2 sponsori
+-- este adaugat la proba de 50 LIBER cu timpul 25 
+-- dupa ce se executa cele 3 instructiuni de inserare se va actualiza cel mai bun timp al probei de 50 LIBER cu timpul de 25 
+
+-- daca timpul ar fi fost mai mare de 29 (fata de rezultatul de mai sus) atunci nu s-ar modifica nimic.
+INSERT INTO PARTICIPA(cod_sportiv,cod_competitie,cod_proba,medaliat)
+VALUES(1,5,1,1);
+
+INSERT INTO ISTORIC_SPORTIV(data_rezultate_sportiv,cod_istoric,cod_rezultat,cod_sportiv)
+VALUES(TO_DATE('14-07-2019','DD-MM-YYYY'),1,12,1);
+
+INSERT INTO REZULTAT(cod_rezultat,cod_proba,loc_clasament,timp_obtinut,cod_sportiv,cod_istoric)
+VALUES(12,1,3,25,1,1);
+
+---------
+--pentru a demonstra ca se ia doar cel mai bun timp doar pe perioada sponsorizarii
+
+-- COMPETITIA cu cod = 1 are loc in anul 2016 cand sportivul cu codul = 1 nu are sponsori
+-- deci acest rezultat nu este luat in calcul, pentru ca nu a fost un rezultat obtinut pe perioada sponsorizarii
+INSERT INTO PARTICIPA(cod_sportiv,cod_competitie,cod_proba,medaliat)
+VALUES(1,1,3,1);
+
+INSERT INTO ISTORIC_SPORTIV(data_rezultate_sportiv,cod_istoric,cod_rezultat,cod_sportiv)
+VALUES(TO_DATE('05-11-2016','DD-MM-YYYY'),1,13,1);
+
+INSERT INTO REZULTAT(cod_rezultat,cod_proba,loc_clasament,timp_obtinut,cod_sportiv,cod_istoric)
+VALUES(13,3,3,55,1,1);
+
+-- REZOLVARE
+
+-- se face un tabel rez in care se face join intre tabele pentru a ajunge de la a lua numele si codul sportivului dorit
+-- pana la a verifica ce rezultate au fost obtinute pe perioada sponsorizarii
+WITH rez AS(SELECT rezultat.cod_proba codProba,proba.nume numeProba,sponsorizeaza.cod_sponsor codSponsor,timp_obtinut 
+                FROM SPORTIV
+                JOIN SPONSORIZEAZA ON sportiv.cod_sportiv = sponsorizeaza.cod_sportiv
+                JOIN ISTORIC_SPORTIV ON sportiv.cod_sportiv = istoric_sportiv.cod_sportiv
+                JOIN REZULTAT ON istoric_sportiv.cod_rezultat = rezultat.cod_rezultat
+                JOIN PROBA ON rezultat.cod_proba = proba.cod_proba
+            WHERE UPPER(sportiv.nume) = 'MARINCA' AND UPPER(sportiv.prenume)='RARES' AND sportiv.cod_sportiv = 1 AND
+                  istoric_sportiv.data_rezultate_sportiv <= sponsorizeaza.sfarsit_colaborare AND
+                  istoric_sportiv.data_rezultate_sportiv >= sponsorizeaza.inceput_colaborare)
+                  
+SELECT codProba, numeProba, COUNT(codSponsor)"NUMAR SPONSORI", MIN(timp_obtinut) 
+FROM rez
+WHERE timp_obtinut IN(SELECT MIN(timp_obtinut)FROM rez GROUP BY codProba)
+GROUP BY codProba, numeProba
+ORDER BY codProba;
+
+--15.
+-- Sa se afiseze antrenorii ai caror sportivi participa la competitii in afara Romaniei
+-- De asemenea, pentru fiecare antrenor sa se afiseze numarul de concursuri din strainatate la care au participat sportivii lor
+-- si sa se afiseze si numarul de medalii obtinute in total la acele competitii
+-- Rezultatul sa se ordoneze descrescator dupa numarul de concursuri.
+-- Acest exercitiu trebuie rezolvat in doua metode.
+
+ROLLBACK;
+
+--ESTE ADAUGAT LA O COMPETITIE NOUA DIN STRAINATATE elevul lui Giurcaneanu
+-- creste numarul de participari la competitii
+-- si numarul de medalii
+INSERT INTO PARTICIPA(cod_sportiv,cod_competitie,cod_proba,medaliat)
+VALUES(5,6,1,1);
+
+INSERT INTO ISTORIC_SPORTIV(data_rezultate_sportiv,cod_istoric,cod_rezultat,cod_sportiv)
+VALUES(TO_DATE('23-06-2021','DD-MM-YYYY'),5,14,5);
+
+INSERT INTO REZULTAT(cod_rezultat,cod_proba,loc_clasament,timp_obtinut,cod_sportiv,cod_istoric)
+VALUES(14,1,3,29,5,5);
+
+-- ESTE ADAUGAT SI LA O ALTA PROBA LA COMPETITIA DE MAI SUS
+-- creste doar numarul de medalii
+INSERT INTO PARTICIPA(cod_sportiv,cod_competitie,cod_proba,medaliat)
+VALUES(5,6,2,1);
+
+INSERT INTO ISTORIC_SPORTIV(data_rezultate_sportiv,cod_istoric,cod_rezultat,cod_sportiv)
+VALUES(TO_DATE('23-06-2021','DD-MM-YYYY'),5,15,5);
+
+INSERT INTO REZULTAT(cod_rezultat,cod_proba,loc_clasament,timp_obtinut,cod_sportiv,cod_istoric)
+VALUES(15,2,3,35,5,5);
+
+
+--ESTE ADAUGAT LA O COMPETITIE NOUA DIN STRAINATATE
+--SIMION ANDREI - ELEV AL LUI IULIA BECHERU, MEDALIAT
+INSERT INTO PARTICIPA(cod_sportiv,cod_competitie,cod_proba,medaliat)
+VALUES(12,6,1,1);
+
+INSERT INTO ISTORIC_SPORTIV(data_rezultate_sportiv,cod_istoric,cod_rezultat,cod_sportiv)
+VALUES(TO_DATE('23-06-2021','DD-MM-YYYY'),12,16,12);
+
+INSERT INTO REZULTAT(cod_rezultat,cod_proba,loc_clasament,timp_obtinut,cod_sportiv,cod_istoric)
+VALUES(16,1,2,28,12,12);
+
+--SIMION inscris la o alta proba MEDALIAT
+INSERT INTO PARTICIPA(cod_sportiv,cod_competitie,cod_proba,medaliat)
+VALUES(12,6,2,1);
+
+INSERT INTO ISTORIC_SPORTIV(data_rezultate_sportiv,cod_istoric,cod_rezultat,cod_sportiv)
+VALUES(TO_DATE('23-06-2021','DD-MM-YYYY'),12,17,12);
+
+INSERT INTO REZULTAT(cod_rezultat,cod_proba,loc_clasament,timp_obtinut,cod_sportiv,cod_istoric)
+VALUES(17,1,2,34,12,12);
+
+--ESTE ADAUGAT LA O COMPETITIE NOUA DIN STRAINATATE
+--POPESCU ROBERT - ELEV AL LUI IULIA BECHERU, MEDALIAT
+INSERT INTO PARTICIPA(cod_sportiv,cod_competitie,cod_proba,medaliat)
+VALUES(2,6,1,1);
+
+INSERT INTO ISTORIC_SPORTIV(data_rezultate_sportiv,cod_istoric,cod_rezultat,cod_sportiv)
+VALUES(TO_DATE('23-06-2021','DD-MM-YYYY'),2,18,2);
+
+INSERT INTO REZULTAT(cod_rezultat,cod_proba,loc_clasament,timp_obtinut,cod_sportiv,cod_istoric)
+VALUES(18,1,2,27,2,2);
+
+-- prima metoda
+
+SELECT antrenor.nume||' '||antrenor.prenume "NUME ANTRENOR", COUNT(DISTINCT competitie.cod_competitie) "NUMAR COMPETITII PARTICIPAT", SUM(participa.medaliat)"NR. MEDALII COMPETITII STRAINATATE"
+FROM ANTRENOR
+JOIN SPORTIV ON antrenor.cod_antrenor = sportiv.cod_antrenor
+JOIN PARTICIPA ON sportiv.cod_sportiv = participa.cod_sportiv
+JOIN COMPETITIE ON participa.cod_competitie = competitie.cod_competitie
+JOIN ORAS ON competitie.cod_oras = oras.cod_oras
+JOIN TARA ON oras.cod_tara = tara.cod_tara
+
+WHERE UPPER(nume_tara) != 'ROMANIA'
+GROUP BY antrenor.nume,antrenor.prenume
+ORDER BY "NUMAR COMPETITII PARTICIPAT" DESC;
+
+
+
+--METODA CU WITH
+
+WITH rez AS(
+SELECT antrenor.nume nume,antrenor.prenume prenume, competitie.cod_competitie codcomp, participa.medaliat medaliati
+FROM ANTRENOR
+JOIN SPORTIV ON antrenor.cod_antrenor = sportiv.cod_antrenor
+JOIN PARTICIPA ON sportiv.cod_sportiv = participa.cod_sportiv
+JOIN COMPETITIE ON participa.cod_competitie = competitie.cod_competitie
+JOIN ORAS ON competitie.cod_oras = oras.cod_oras
+JOIN TARA ON oras.cod_tara = tara.cod_tara
+WHERE UPPER(nume_tara) != 'ROMANIA')
+
+SELECT nume||' '||prenume "NUME ANTRENOR", count(distinct codcomp) "NUMAR COMPETITII PARTICIPAT",SUM(medaliati)"NR. MEDALII COMPETITII STRAINATATE"
+FROM rez
+GROUP BY nume,prenume
+ORDER BY "NUMAR COMPETITII PARTICIPAT" DESC;
